@@ -1,5 +1,6 @@
 from threading import Thread, Lock
 from queue import Queue
+import os
 from scrappers import *
 from menel.scrappers import BaseScrapper
 
@@ -67,4 +68,5 @@ class Runner:
 
 
 if __name__ == '__main__':
+    os.chdir(os.path.abspath(os.path.dirname(__file__)))
     Runner.run()
