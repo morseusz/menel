@@ -1,7 +1,7 @@
 from threading import Thread, Lock
 from queue import Queue
 import os
-from scrappers import *
+import scrappers
 from menel.scrappers import BaseScrapper
 
 
@@ -13,26 +13,29 @@ runs them concurrently according to specified dependencies.
 
 class Runner:
     """Main class which collects scrappers and runs them."""
-    def __init__(self):
+    def __init__(self, scrapper_module):
         """
+        Arguments:
+        scrapper_module - module containing scrapper classes
+
         Attributes:
         scrappers - list of collected scrappers
         scrappers_lock - lock guarding scrappers list
         queue - queue of scrappers ready to run
         """
         self.scrappers = []
-        self.get_all_scrappers()
+        self.get_all_scrappers(scrapper_module)
         self.scrappers_lock = Lock()
         self.queue = Queue()
 
-    def get_all_scrappers(self):
-        """Retrieves all classes subclassing BaseScrapper"""
-        globs = globals()
-        for g in globs:
-            cls = globs[g]
+    def get_all_scrappers(self, scrapper_module):
+        """Retrieves all classes subclassing BaseScrapper
+        from self.scrapper_module"""
+        attrs = [getattr(scrapper_module, x) for x in dir(scrapper_module)]
+        for attr in attrs:
             try:
-                if issubclass(cls, BaseScrapper):
-                    self.scrappers.append(cls())
+                if issubclass(attr, BaseScrapper):
+                    self.scrappers.append(attr())
             except TypeError:
                 pass
 
@@ -61,7 +64,7 @@ class Runner:
         """
         cls = type(to_unblock)
         with self.scrappers_lock:
-            for scrapper in self.scrappers:
+            for scrapper in reversed(self.scrappers):
                 if cls not in scrapper.requires:
                     continue
                 scrapper.requires.remove(cls)
@@ -92,7 +95,7 @@ class Runner:
             thread = Thread(target=self.run_and_unblock_dependencies(scrapper))
             thread.start()
             threads.append(thread)
-            if not self.scrappers:
+            if not self.scrappers and not self.queue.qsize():
                 break
 
         for thread in threads:
@@ -101,4 +104,4 @@ class Runner:
 
 if __name__ == '__main__':
     os.chdir(os.path.abspath(os.path.dirname(__file__)))
-    Runner.run()
+    Runner.run(scrappers)
